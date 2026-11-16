@@ -1,8 +1,29 @@
-from typing import Optional
-from sqlmodel import SQLModel, Field
+# --- Les librairies dont on a besoin ---
+from datetime import datetime, timezone  # pour la date de création
+from typing import Optional  # pour dire qu'une valeur peut être vide au départ
+
+from sqlalchemy import JSON, Column  # pour créer une colonne de type JSON
+from sqlmodel import Field, SQLModel  # pour décrire les tables de la base
 
 
+# Table "user" : les utilisateurs (déjà écrite par le CTO)
 class User(SQLModel, table=True):
-    id: Optional[int] = Field(primary_key=True)
-    email: str = Field(unique=True, index=True)
-    hashed_password: str = Field()
+    id: Optional[int] = Field(primary_key=True)  # le numéro de l'utilisateur
+    email: str = Field(unique=True, index=True)  # l'email (unique)
+    hashed_password: str = Field()  # le mot de passe caché
+
+
+# Table "chat" : les discussions
+class Chat(SQLModel, table=True):
+    # Le numéro de la discussion (créé automatiquement par la base)
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Le numéro de l'utilisateur à qui appartient la discussion.
+    # "foreign_key" = clé étrangère : elle pointe vers l'id de la table "user"
+    user_id: int = Field(foreign_key="user.id", index=True)
+
+    # Tout l'historique des messages, rangé en JSON (vide au départ)
+    messages: list = Field(default_factory=list, sa_column=Column(JSON))
+
+    # La date de création de la discussion (remplie automatiquement)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

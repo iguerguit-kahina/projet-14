@@ -5,10 +5,10 @@ from pydantic import BaseModel  # pour décrire la forme des données
 from sqlmodel import Session, select  # pour lire dans la base de données
 import uvicorn  # le serveur qui fait tourner le backend
 
-from auth import create_access_token, verify_password  # nos 2 outils de auth.py
-from models import User  # la forme d'un utilisateur (email + mot de passe caché)
+from auth import create_access_token, get_current_user_id, verify_password  # nos outils de auth.py
+from models import Chat, User  # les tables : utilisateurs et discussions
 from fastapi.middleware.cors import CORSMiddleware  # pour autoriser le frontend à parler au backend
-
+from datetime import datetime  # pour la date de création des discussions
 # On crée l'application backend
 app = FastAPI()
 
@@ -44,6 +44,20 @@ class LoginResponse(BaseModel):
     access_token: str  # le badge
     token_type: str = "bearer"  # le type de badge ("bearer" = "porteur", le standard)
 
+# Ce que le backend renvoie quand une discussion est créée : son numéro
+class ChatCreatedResponse(BaseModel):
+    id: int
+
+    # Ce que le backend renvoie quand on lit une discussion
+class ChatResponse(BaseModel):
+    id: int  # le numéro de la discussion
+    messages: list  # l'historique des messages
+    created_at: datetime  # la date de création
+
+# Ce que le backend renvoie pour chaque discussion dans la liste : son numéro et sa date
+class ChatSummary(BaseModel):
+    id: int
+    created_at: datetime
 
 # Route de test : affiche 👋 (déjà écrite par le CTO)
 @app.get("/")
@@ -65,7 +79,57 @@ def login(credentials: LoginRequest, session: Session = Depends(get_session)):
 
     # 3. Tout est bon → on crée le badge et on le renvoie
     return LoginResponse(access_token=create_access_token(user.id))
+# Route pour créer une nouvelle discussion (vide) et renvoyer son numéro
+@app.post("/chats", response_model=ChatCreatedResponse, status_code=201)
+def create_chat(
+    user_id: int = Depends(get_current_user_id),  # le contrôleur vérifie le badge
+    session: Session = Depends(get_session),  # la connexion à la base
+):
+    # 1. On crée une discussion vide, qui appartient à cet utilisateur
+    chat = Chat(user_id=user_id)
 
+    # 2. On l'enregistre dans la base
+    session.add(chat)
+    session.commit()
+    session.refresh(chat)  # on récupère le numéro créé par la base
+
+    # 3. On renvoie son numéro
+    return ChatCreatedResponse(id=chat.id)
+
+# Route pour lister les discussions de l'utilisateur connecté (pour la colonne de gauche)
+@app.get("/chats", response_model=list[ChatSummary])
+def list_chats(
+    user_id: int = Depends(get_current_user_id),  # le contrôleur vérifie le badge
+    session: Session = Depends(get_session),
+):
+    # On prend seulement SES discussions, de la plus récente à la plus ancienne
+    statement = (
+        select(Chat)
+        .where(Chat.user_id == user_id)
+        .order_by(Chat.created_at.desc())
+    )
+    chats = session.exec(statement).all()
+
+    # On renvoie le numéro et la date de chaque discussion
+    return [ChatSummary(id=chat.id, created_at=chat.created_at) for chat in chats]
+
+# Route pour lire une discussion (son historique)
+@app.get("/chats/{chat_id}", response_model=ChatResponse)
+def get_chat(
+    chat_id: int,  # le numéro de la discussion, lu dans l'adresse
+    user_id: int = Depends(get_current_user_id),  # le contrôleur vérifie le badge
+    session: Session = Depends(get_session),
+):
+    # 1. On cherche la discussion avec ce numéro
+    chat = session.get(Chat, chat_id)
+
+    # 2. Elle n'existe pas, ou elle appartient à quelqu'un d'autre → 404
+    #    (même réponse dans les 2 cas : on ne révèle pas qu'elle existe)
+    if chat is None or chat.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Discussion introuvable")
+
+    # 3. Tout est bon → on renvoie la discussion
+    return ChatResponse(id=chat.id, messages=chat.messages, created_at=chat.created_at)
 
 # Ce qui se passe quand on lance le fichier avec "uv run ... src/main.py"
 if __name__ == "__main__":
