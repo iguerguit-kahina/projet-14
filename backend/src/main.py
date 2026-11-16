@@ -1,14 +1,18 @@
 # --- Les librairies et fichiers dont on a besoin ---
 from database import init_db, engine  # la connexion à la base (fichier du CTO)
 from fastapi import Depends, FastAPI, HTTPException  # pour créer l'API et les erreurs
-from pydantic import BaseModel  # pour décrire la forme des données
+from fastapi.middleware.cors import CORSMiddleware  # pour autoriser le frontend à parler au backend
+from pydantic import BaseModel, Field  # pour décrire la forme des données (🆕 Field)
+from pydantic_ai.messages import ModelMessagesTypeAdapter  # 🆕 pour relire l'historique enregistré en JSON
+from pydantic_core import to_jsonable_python  # 🆕 pour transformer l'historique en JSON
 from sqlmodel import Session, select  # pour lire dans la base de données
+from datetime import datetime  # pour la date de création des discussions
 import uvicorn  # le serveur qui fait tourner le backend
 
+from agent import chat_agent  # 🆕 notre agent IA
 from auth import create_access_token, get_current_user_id, verify_password  # nos outils de auth.py
 from models import Chat, User  # les tables : utilisateurs et discussions
-from fastapi.middleware.cors import CORSMiddleware  # pour autoriser le frontend à parler au backend
-from datetime import datetime  # pour la date de création des discussions
+
 # On crée l'application backend
 app = FastAPI()
 
@@ -44,20 +48,34 @@ class LoginResponse(BaseModel):
     access_token: str  # le badge
     token_type: str = "bearer"  # le type de badge ("bearer" = "porteur", le standard)
 
+
 # Ce que le backend renvoie quand une discussion est créée : son numéro
 class ChatCreatedResponse(BaseModel):
     id: int
 
-    # Ce que le backend renvoie quand on lit une discussion
+
+# Ce que le backend renvoie quand on lit une discussion
 class ChatResponse(BaseModel):
     id: int  # le numéro de la discussion
     messages: list  # l'historique des messages
     created_at: datetime  # la date de création
 
+
 # Ce que le backend renvoie pour chaque discussion dans la liste : son numéro et sa date
 class ChatSummary(BaseModel):
     id: int
     created_at: datetime
+
+
+# 🆕 Ce que le frontend envoie : le message de l'utilisateur (au moins 1 caractère)
+class MessageRequest(BaseModel):
+    content: str = Field(min_length=1)
+
+
+# 🆕 Ce que le backend renvoie : la réponse de l'IA
+class MessageResponse(BaseModel):
+    answer: str
+
 
 # Route de test : affiche 👋 (déjà écrite par le CTO)
 @app.get("/")
@@ -79,6 +97,8 @@ def login(credentials: LoginRequest, session: Session = Depends(get_session)):
 
     # 3. Tout est bon → on crée le badge et on le renvoie
     return LoginResponse(access_token=create_access_token(user.id))
+
+
 # Route pour créer une nouvelle discussion (vide) et renvoyer son numéro
 @app.post("/chats", response_model=ChatCreatedResponse, status_code=201)
 def create_chat(
@@ -95,6 +115,7 @@ def create_chat(
 
     # 3. On renvoie son numéro
     return ChatCreatedResponse(id=chat.id)
+
 
 # Route pour lister les discussions de l'utilisateur connecté (pour la colonne de gauche)
 @app.get("/chats", response_model=list[ChatSummary])
@@ -113,6 +134,7 @@ def list_chats(
     # On renvoie le numéro et la date de chaque discussion
     return [ChatSummary(id=chat.id, created_at=chat.created_at) for chat in chats]
 
+
 # Route pour lire une discussion (son historique)
 @app.get("/chats/{chat_id}", response_model=ChatResponse)
 def get_chat(
@@ -130,6 +152,39 @@ def get_chat(
 
     # 3. Tout est bon → on renvoie la discussion
     return ChatResponse(id=chat.id, messages=chat.messages, created_at=chat.created_at)
+
+
+# 🆕 Route pour envoyer un message dans une discussion, et recevoir la réponse de l'IA
+@app.post("/chats/{chat_id}/messages", response_model=MessageResponse)
+async def send_message(
+    chat_id: int,
+    body: MessageRequest,  # le message envoyé par l'utilisateur
+    user_id: int = Depends(get_current_user_id),  # le contrôleur vérifie le badge
+    session: Session = Depends(get_session),
+):
+    # 1. On cherche la discussion, et on vérifie qu'elle appartient à l'utilisateur
+    chat = session.get(Chat, chat_id)
+    if chat is None or chat.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Discussion introuvable")
+
+    # 2. On relit l'historique enregistré (JSON) pour le redonner à l'agent
+    history = ModelMessagesTypeAdapter.validate_python(chat.messages)
+
+    # 3. On envoie le nouveau message + l'historique à l'IA
+    try:
+        result = await chat_agent.run(body.content, message_history=history)
+    except Exception:
+        # L'IA ne répond pas (clé invalide, quota dépassé, panne...) → erreur 502
+        raise HTTPException(status_code=502, detail="L'IA n'a pas pu répondre. Réessayez.")
+
+    # 4. On enregistre tout l'historique (ancien + nouveau message + réponse) en JSON
+    chat.messages = to_jsonable_python(result.all_messages())
+    session.add(chat)
+    session.commit()
+
+    # 5. On renvoie la réponse de l'IA
+    return MessageResponse(answer=result.output)
+
 
 # Ce qui se passe quand on lance le fichier avec "uv run ... src/main.py"
 if __name__ == "__main__":
