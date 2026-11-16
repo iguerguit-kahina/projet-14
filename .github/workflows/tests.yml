@@ -1,0 +1,31 @@
+# Nom du workflow, affiché sur GitHub
+name: Tests backend
+
+# Quand lancer les tests
+on:
+  push:
+    branches: [main]  # à chaque git push sur main
+  pull_request:  # à chaque proposition de modification
+  workflow_dispatch:  # bouton pour lancer à la main (pratique pour déboguer)
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest  # GitHub prête un ordinateur Linux
+
+    # Toutes les commandes se lancent dans le dossier backend
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      # 1. Récupérer le code du repo
+      - uses: actions/checkout@v4
+
+      # 2. Installer uv
+      - uses: astral-sh/setup-uv@v6
+
+      # 3. Installer Python et toutes les librairies (avec pytest)
+      - run: uv sync
+
+      # 4. Lancer les tests
+      - run: uv run pytest
