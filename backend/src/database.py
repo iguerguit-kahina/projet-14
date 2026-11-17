@@ -29,3 +29,9 @@ def init_db():
                 )
             )
             session.commit()
+
+
+# Ouvre une connexion à la base de données pour une requête, puis la referme
+def get_session():
+    with Session(engine) as session:
+        yield session  # on "prête" la connexion à la route, puis on la referme

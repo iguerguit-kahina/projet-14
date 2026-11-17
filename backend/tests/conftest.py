@@ -14,7 +14,8 @@ from sqlalchemy.pool import StaticPool  # pour garder la base en mémoire pendan
 from sqlmodel import Session, SQLModel, create_engine
 
 from auth import create_access_token  # pour fabriquer les badges de test
-from main import app, get_session  # l'application et sa connexion à la base
+from database import get_session  # la connexion à la base (elle est maintenant dans database.py)
+from main import app  # l'application
 from models import User  # la table des utilisateurs
 
 # Sécurité : interdit tout appel au vrai Mistral pendant les tests
