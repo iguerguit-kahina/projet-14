@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+/* pour bien afficher les titres, le gras et les listes du Markdown */
 
 :root {
   --background: #ffffff;

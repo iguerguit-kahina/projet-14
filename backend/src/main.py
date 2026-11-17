@@ -9,7 +9,7 @@ from sqlmodel import Session, select  # pour lire dans la base de données
 from datetime import datetime  # pour la date de création des discussions
 import uvicorn  # le serveur qui fait tourner le backend
 
-from agent import chat_agent  # 🆕 notre agent IA
+from agent import chat_agent, to_display_messages  # notre agent IA + la simplification des messages
 from auth import create_access_token, get_current_user_id, verify_password  # nos outils de auth.py
 from models import Chat, User  # les tables : utilisateurs et discussions
 
@@ -53,11 +53,17 @@ class LoginResponse(BaseModel):
 class ChatCreatedResponse(BaseModel):
     id: int
 
+# Un message simple, prêt à afficher dans une bulle
+class DisplayMessage(BaseModel):
+    role: str  # "user" (l'utilisateur) ou "assistant" (l'IA)
+    content: str  # le texte du message
+    timestamp: datetime  # l'heure du message
+
 
 # Ce que le backend renvoie quand on lit une discussion
 class ChatResponse(BaseModel):
     id: int  # le numéro de la discussion
-    messages: list  # l'historique des messages
+    messages: list[DisplayMessage]  # l'historique, en messages simples
     created_at: datetime  # la date de création
 
 
@@ -151,8 +157,9 @@ def get_chat(
         raise HTTPException(status_code=404, detail="Discussion introuvable")
 
     # 3. Tout est bon → on renvoie la discussion
-    return ChatResponse(id=chat.id, messages=chat.messages, created_at=chat.created_at)
-
+    return ChatResponse(
+        id=chat.id, messages=to_display_messages(chat.messages), created_at=chat.created_at
+    )
 
 # 🆕 Route pour envoyer un message dans une discussion, et recevoir la réponse de l'IA
 @app.post("/chats/{chat_id}/messages", response_model=MessageResponse)
