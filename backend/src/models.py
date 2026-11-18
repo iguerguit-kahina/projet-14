@@ -2,7 +2,7 @@
 from datetime import datetime, timezone  # pour la date de création
 from typing import Optional  # pour dire qu'une valeur peut être vide au départ
 
-from sqlalchemy import JSON, Column  # pour créer une colonne de type JSON
+from sqlalchemy import JSON, Column, Text  # pour les colonnes JSON et les textes longs
 from sqlmodel import Field, SQLModel  # pour décrire les tables de la base
 
 
@@ -24,6 +24,9 @@ class Chat(SQLModel, table=True):
 
     # Tout l'historique des messages, rangé en JSON (vide au départ)
     messages: list = Field(default_factory=list, sa_column=Column(JSON))
+
+        # Le prompt système de cette discussion (prompt de base + actualités de son jour)
+    system_prompt: Optional[str] = Field(default=None, sa_column=Column(Text))
 
     # La date de création de la discussion (remplie automatiquement)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

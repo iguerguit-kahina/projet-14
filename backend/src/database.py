@@ -2,6 +2,7 @@ import os
 from models import User
 from sqlmodel import SQLModel, Session, create_engine, select
 import bcrypt
+from sqlalchemy import text  # pour écrire une commande SQL directement
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=True)
@@ -9,6 +10,10 @@ engine = create_engine(DATABASE_URL, echo=True)
 
 def init_db():
     SQLModel.metadata.create_all(engine)
+    # La table "chat" existe déjà : create_all n'y ajoute pas les nouvelles colonnes.
+    # On ajoute donc la colonne "system_prompt" à la main, si elle n'existe pas encore.
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS system_prompt TEXT"))
     print("Database initialized successfully")
 
     # Creating a default user

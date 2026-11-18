@@ -2,6 +2,9 @@ from pydantic_ai.models.test import TestModel  # le faux LLM de PydanticAI
 
 from agent import chat_agent  # notre agent, qu'on va remplacer par le faux LLM
 
+from pydantic_ai.messages import ModelResponse, SystemPromptPart, TextPart  # pour le faux LLM du test 9
+from pydantic_ai.models.function import FunctionModel  # un faux LLM qu'on programme nous-mêmes
+
 
 # Test 3 : sans badge, on ne peut pas créer de discussion
 def test_creer_discussion_sans_badge(client):
@@ -63,3 +66,26 @@ def test_liste_bob_sans_discussions_alice(client, alice_headers, bob_headers):
 
     response = client.get("/chats", headers=bob_headers)
     assert response.json() == []  # la liste de Bob est vide
+
+
+
+
+# Test 9 : les actualités du jour sont bien données à l'IA, dans le prompt système
+def test_actualites_dans_le_prompt(client, alice_headers):
+    chat_id = client.post("/chats", headers=alice_headers).json()["id"]
+
+    # Un faux LLM qui "note" le prompt système qu'il reçoit
+    received_prompts = []
+
+    def fake_llm(messages, info):
+        for message in messages:
+            for part in message.parts:
+                if isinstance(part, SystemPromptPart):
+                    received_prompts.append(part.content)
+        return ModelResponse(parts=[TextPart("ok")])
+
+    with chat_agent.override(model=FunctionModel(fake_llm)):
+        client.post(f"/chats/{chat_id}/messages", headers=alice_headers, json={"content": "Quoi de neuf ?"})
+
+    # On vérifie : le prompt reçu par l'IA contient bien la fausse actualité
+    assert "Titre de test" in received_prompts[0]

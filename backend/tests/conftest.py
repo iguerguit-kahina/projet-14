@@ -72,3 +72,15 @@ def alice_headers(alice):
 @pytest.fixture
 def bob_headers(bob):
     return {"Authorization": f"Bearer {create_access_token(bob.id)}"}
+
+
+
+# Fausses actualités, utilisées à la place de World News API pendant les tests
+FAKE_ARTICLES = [{"title": "Titre de test", "summary": "Résumé de test"}]
+
+
+# autouse=True : cette fixture s'applique AUTOMATIQUEMENT à tous les tests.
+# Elle remplace fetch_top_news par une fonction qui renvoie les fausses actualités.
+@pytest.fixture(autouse=True)
+def fake_news(monkeypatch):
+    monkeypatch.setattr("routes.chat_routes.fetch_top_news", lambda: FAKE_ARTICLES)

@@ -1,10 +1,15 @@
 # --- Les routes des discussions ---
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic_ai.messages import ModelMessagesTypeAdapter  # pour relire l'historique enregistré en JSON
+from pydantic_ai.messages import (  # pour relire l'historique, et créer le 1er message avec le prompt
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    SystemPromptPart,
+)
 from pydantic_core import to_jsonable_python  # pour transformer l'historique en JSON
 from sqlmodel import Session, select
 
-from agent import chat_agent, to_display_messages  # notre agent IA + la simplification des messages
+from agent import BASE_SYSTEM_PROMPT, build_system_prompt, chat_agent, to_display_messages  # l'IA
+from news import fetch_top_news  # pour récupérer les actualités du jour
 from auth import get_current_user_id  # le contrôleur de badge
 from database import get_session  # la connexion à la base
 from models import Chat  # la table des discussions
@@ -27,7 +32,15 @@ def create_chat(
     user_id: int = Depends(get_current_user_id),  # le contrôleur vérifie le badge
     session: Session = Depends(get_session),
 ):
-    chat = Chat(user_id=user_id)  # une discussion vide, qui appartient à cet utilisateur
+       # 1. On récupère les actualités du jour.
+    #    Si World News API ne répond pas, on continue quand même, sans actualités.
+    try:
+        articles = fetch_top_news()
+    except Exception:
+        articles = []
+
+    # 2. On crée la discussion avec SON prompt (prompt de base + actualités du jour)
+    chat = Chat(user_id=user_id, system_prompt=build_system_prompt(articles))
     session.add(chat)
     session.commit()
     session.refresh(chat)  # on récupère le numéro créé par la base
@@ -82,9 +95,14 @@ async def send_message(
     if chat is None or chat.user_id != user_id:
         raise HTTPException(status_code=404, detail="Discussion introuvable")
 
-    # 2. On relit l'historique enregistré (JSON) pour le redonner à l'agent
-    history = ModelMessagesTypeAdapter.validate_python(chat.messages)
-
+        # 2. On relit l'historique enregistré (JSON) pour le redonner à l'agent
+    if chat.messages:
+        # La discussion a déjà des messages : l'historique contient déjà son prompt
+        history = ModelMessagesTypeAdapter.validate_python(chat.messages)
+    else:
+        # 1er message : on commence l'historique avec le prompt de la discussion
+        # (s'il n'y en a pas, pour les anciennes discussions, on prend le prompt de base)
+        history = [ModelRequest(parts=[SystemPromptPart(content=chat.system_prompt or BASE_SYSTEM_PROMPT)])]
     # 3. On envoie le nouveau message + l'historique à l'IA
     try:
         result = await chat_agent.run(body.content, message_history=history)
