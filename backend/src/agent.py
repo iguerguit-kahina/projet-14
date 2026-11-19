@@ -1,6 +1,7 @@
 # --- La librairie dont on a besoin ---
 from pydantic_ai import Agent  # pour créer un agent (un LLM avec un rôle et des instructions)
 from datetime import date  # pour la date du jour
+import news  # pour utiliser search_news (la recherche d'articles)
 # Le modèle Mistral utilisé : "small" est rapide et peu cher
 MODEL_NAME = "mistral:mistral-small-latest"
 
@@ -14,7 +15,11 @@ Règles :
 - Adopte un ton professionnel, neutre et factuel, comme un journaliste.
 - Sois clair et concis : commence par un court résumé, puis présente les points clés sous forme de liste à puces.
 - Ne jamais inventer d'informations, de chiffres ou de sources. Si tu ne connais pas une information récente, dis-le clairement.
-- Quand c'est pertinent, propose à l'utilisateur de générer une revue de presse sur le sujet abordé."""
+- Quand c'est pertinent, propose à l'utilisateur de générer une revue de presse sur le sujet abordé.
+- Si l'utilisateur veut approfondir un sujet, utilise l'outil rechercher_articles pour trouver des articles récents.
+- Quand tu utilises des articles, cite tes sources : le titre, la date et le lien.
+- Ne donne jamais de chiffres ou de dates qui ne viennent pas des articles.
+- N'annonce pas que tu vas faire une recherche : fais-la directement, puis réponds."""
 
 # Fabrique le prompt complet : le prompt de base + les actualités du jour.
 # articles = la liste renvoyée par fetch_top_news() : [{"title": ..., "summary": ...}]
@@ -43,6 +48,31 @@ Pour toute question sur l'actualité, appuie-toi en priorité sur ces actualité
 # L'agent du chat. Il n'a plus de prompt fixe : chaque discussion aura SON prompt
 # (avec les actualités de son jour), enregistré dans la base.
 chat_agent = Agent(MODEL_NAME, defer_model_check=True)
+
+
+
+# L'outil de l'agent : chercher des articles sur un sujet.
+# "@chat_agent.tool_plain" = « cette fonction est un outil que l'agent peut appeler ».
+@chat_agent.tool_plain
+def rechercher_articles(sujet: str) -> list[dict] | str:
+    """Cherche des articles de presse récents, en français, sur un sujet précis.
+
+    Utilise cet outil quand l'utilisateur veut en savoir plus sur un sujet,
+    ou quand les actualités du jour ne suffisent pas pour répondre.
+
+    Args:
+        sujet: les mots-clés à chercher, par exemple "grève SNCF" ou "présidentielle 2027".
+    """
+    # On demande les articles à news.py (World News API)
+    try:
+        articles = news.search_news(sujet)
+    except Exception:
+        # L'API ne répond pas : on le dit à l'agent, pour qu'il prévienne l'utilisateur
+        return "La recherche d'articles n'a pas fonctionné. Préviens l'utilisateur."
+
+    if not articles:
+        return "Aucun article trouvé sur ce sujet."
+    return articles
 # --- Pour transformer l'historique de PydanticAI en messages simples à afficher ---
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,  # pour relire l'historique enregistré en JSON

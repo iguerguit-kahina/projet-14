@@ -89,3 +89,28 @@ def test_actualites_dans_le_prompt(client, alice_headers):
 
     # On vérifie : le prompt reçu par l'IA contient bien la fausse actualité
     assert "Titre de test" in received_prompts[0]
+
+
+
+# Test 10 : l'agent peut utiliser son outil pour chercher des articles
+def test_outil_recherche_articles(client, alice_headers, monkeypatch):
+    # Une fausse recherche, qui note le sujet demandé et renvoie un faux article
+    searched_subjects = []
+
+    def fake_search_news(query):
+        searched_subjects.append(query)
+        return [{"title": "Article trouvé", "summary": "Résumé", "date": "2026-11-19", "url": "https://exemple.fr"}]
+
+    monkeypatch.setattr("news.search_news", fake_search_news)
+
+    chat_id = client.post("/chats", headers=alice_headers).json()["id"]
+
+    # TestModel (le faux LLM) appelle automatiquement les outils de l'agent
+    with chat_agent.override(model=TestModel()):
+        response = client.post(
+            f"/chats/{chat_id}/messages", headers=alice_headers, json={"content": "Parle-moi de la SNCF"}
+        )
+
+    # On vérifie : la réponse est OK, et l'outil a bien cherché des articles (1 fois)
+    assert response.status_code == 200
+    assert len(searched_subjects) == 1

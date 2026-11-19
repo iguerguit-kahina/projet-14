@@ -42,3 +42,37 @@ def fetch_top_news(country: str = "fr", language: str = "fr") -> list[dict]:
 
     # 3. On renvoie la liste simple
     return articles
+
+
+
+# Le nombre d'articles renvoyés par une recherche (pour que la réponse reste courte)
+MAX_SEARCH_RESULTS = 5
+
+
+# Cherche des articles récents sur un sujet précis (route /search-news).
+# Renvoie une liste simple : [{"title", "summary", "date", "url"}, ...]
+def search_news(query: str) -> list[dict]:
+    # 1. On envoie la demande à World News API
+    response = httpx.get(
+        f"{WORLD_NEWS_API_URL}/search-news",
+        params={
+            "text": query,  # les mots-clés à chercher, ex : "grève SNCF"
+            "language": "fr",  # des articles en français
+            "sort": "publish-time",  # les plus récents d'abord
+            "number": MAX_SEARCH_RESULTS,  # 5 articles maximum
+        },
+        headers={"x-api-key": os.getenv("WORLD_NEWS_API_KEY")},
+        timeout=15,
+    )
+    response.raise_for_status()  # si l'API renvoie une erreur → on arrête ici
+
+    # 2. Pour chaque article, on garde seulement le titre, le résumé, la date et le lien
+    return [
+        {
+            "title": article.get("title", ""),
+            "summary": article.get("summary") or article.get("text", "")[:500],
+            "date": article.get("publish_date", ""),
+            "url": article.get("url", ""),
+        }
+        for article in response.json().get("news", [])
+    ]
