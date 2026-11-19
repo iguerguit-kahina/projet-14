@@ -2,6 +2,7 @@
 from pydantic_ai import Agent  # pour créer un agent (un LLM avec un rôle et des instructions)
 from datetime import date  # pour la date du jour
 import news  # pour utiliser search_news (la recherche d'articles)
+
 # Le modèle Mistral utilisé : "small" est rapide et peu cher
 MODEL_NAME = "mistral:mistral-small-latest"
 
@@ -48,7 +49,6 @@ Pour toute question sur l'actualité, appuie-toi en priorité sur ces actualité
 # L'agent du chat. Il n'a plus de prompt fixe : chaque discussion aura SON prompt
 # (avec les actualités de son jour), enregistré dans la base.
 chat_agent = Agent(MODEL_NAME, defer_model_check=True)
-
 
 
 # L'outil de l'agent : chercher des articles sur un sujet.
