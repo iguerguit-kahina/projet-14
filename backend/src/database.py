@@ -14,6 +14,12 @@ def init_db():
     # On ajoute donc la colonne "system_prompt" à la main, si elle n'existe pas encore.
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS system_prompt TEXT"))
+        # Étape 7 : les colonnes de la revue de presse
+        # VARCHAR = texte court ; TEXT = texte long ; JSON = liste ; TIMESTAMP = date + heure
+        connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS review_title VARCHAR"))
+        connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS review_synthesis TEXT"))
+        connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS review_articles JSON"))
+        connection.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS review_created_at TIMESTAMP"))
     print("Database initialized successfully")
 
     # Creating a default user

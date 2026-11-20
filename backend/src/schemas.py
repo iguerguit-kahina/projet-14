@@ -49,3 +49,34 @@ class MessageRequest(BaseModel):
 # Ce que le backend renvoie : la réponse de l'IA
 class MessageResponse(BaseModel):
     answer: str
+
+
+# --- Étape 7 : le format de la revue de presse (sortie structurée) ---
+
+# Le formulaire d'un article
+class ArticleSummary(BaseModel):
+    title: str = Field(description="Le titre de l'article")
+    source: str = Field(description="Le média, par exemple Radio France")
+    date: str | None = Field(default=None, description="La date de l'article, si elle est connue")
+    url: str | None = Field(default=None, description="Le lien de l'article, s'il est connu")
+    summary: str = Field(description="Le résumé de l'article en 2 ou 3 phrases")
+
+
+# Le formulaire de la revue de presse complète
+class PressReview(BaseModel):
+    title: str = Field(description="Le titre de la revue de presse")
+    synthesis: str = Field(description="La synthèse générale du sujet")
+    articles: list[ArticleSummary] = Field(description="Les articles de la discussion sur ce sujet")
+
+# Ce que le frontend envoie pour générer une revue : le thème choisi
+class ReviewRequest(BaseModel):
+    topic: str = Field(min_length=1)
+
+
+# Ce que le backend renvoie pour une revue de presse
+class ReviewResponse(BaseModel):
+    chat_id: int  # la discussion d'où vient la revue
+    title: str
+    synthesis: str
+    articles: list[ArticleSummary]
+    created_at: datetime  # la date de la revue

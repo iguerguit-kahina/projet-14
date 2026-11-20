@@ -4,7 +4,7 @@ from fastapi import FastAPI  # pour créer l'API
 from fastapi.middleware.cors import CORSMiddleware  # pour autoriser le frontend à parler au backend
 
 from database import init_db  # la préparation de la base (fichier du CTO)
-from routes import auth_routes, chat_routes  # nos groupes de routes
+from routes import auth_routes, chat_routes, review_routes  # nos groupes de routes
 
 # On crée l'application backend
 app = FastAPI()
@@ -33,6 +33,7 @@ async def hello():
 # On branche les groupes de routes
 app.include_router(auth_routes.router)  # la route /login
 app.include_router(chat_routes.router)  # les routes /chats
+app.include_router(review_routes.router)
 
 
 # Ce qui se passe quand on lance le fichier avec "uv run ... src/main.py"

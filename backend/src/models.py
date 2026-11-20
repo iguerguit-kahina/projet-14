@@ -25,8 +25,14 @@ class Chat(SQLModel, table=True):
     # Tout l'historique des messages, rangé en JSON (vide au départ)
     messages: list = Field(default_factory=list, sa_column=Column(JSON))
 
-        # Le prompt système de cette discussion (prompt de base + actualités de son jour)
+    # Le prompt système de cette discussion (prompt de base + actualités de son jour)
     system_prompt: Optional[str] = Field(default=None, sa_column=Column(Text))
 
     # La date de création de la discussion (remplie automatiquement)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+ # --- Étape 7 : la revue de presse (vide tant qu'elle n'est pas générée) ---
+    review_title: Optional[str] = None
+    review_synthesis: Optional[str] = Field(default=None, sa_column=Column(Text))
+    review_articles: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    review_created_at: Optional[datetime] = None
