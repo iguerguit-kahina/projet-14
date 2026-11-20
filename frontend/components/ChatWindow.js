@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api"; // l'outil qui envoie le badge au backend
 import ReactMarkdown from "react-markdown"; // transforme le Markdown en vrais titres, gras, listes
-
+import ReviewModal from "./ReviewModal"; // la modale pour générer une revue de presse
 // Transforme une date en heure lisible, ex : "10:31"
 function formatTime(timestamp) {
     return new Date(timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -72,9 +72,12 @@ export default function ChatWindow({ chatId, onChatCreated }) {
     const [input, setInput] = useState(""); // 🆕 le texte en train d'être écrit
     const [isSending, setIsSending] = useState(false); // 🆕 vrai pendant que l'IA réfléchit
     const bottomRef = useRef(null); // 🆕 un repère tout en bas, pour y faire défiler
+    const [showReviewModal, setShowReviewModal] = useState(false); // vrai quand la modale est ouverte
+    const [reviewNotice, setReviewNotice] = useState(""); // le message "Revue générée ✅"
 
     // À chaque changement de discussion, on charge ses messages (GET /chats/{id})
     useEffect(() => {
+        setReviewNotice(""); // on efface le message de réussite quand on change de discussion
         if (!chatId) {
             setMessages([]); // aucune discussion ouverte → écran d'accueil
             return;
@@ -144,9 +147,41 @@ export default function ChatWindow({ chatId, onChatCreated }) {
             handleSend(event);
         }
     }
-
+    // Quand la revue est générée : on ferme la modale et on affiche un message de réussite
+    function handleReviewGenerated(review) {
+        setShowReviewModal(false);
+        setReviewNotice(`✅ Revue de presse générée : « ${review.title} »`);
+    }
     return (
         <div className="flex h-full flex-1 flex-col">
+            {/* La barre du haut, avec le bouton "Générer une revue de presse" (seulement s'il y a des messages) */}
+            {chatId && messages.length > 0 && (
+                <div className="flex items-center justify-end border-b border-gray-200 bg-white px-6 py-3">
+                    <button
+                        type="button"
+                        onClick={() => setShowReviewModal(true)}
+                        className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-700"
+                    >
+                        📄 Générer une revue de presse
+                    </button>
+                </div>
+            )}
+
+            {/* Le message de réussite, après la génération */}
+            {reviewNotice && (
+                <p role="status" className="bg-green-50 px-6 py-2 text-sm text-green-700">
+                    {reviewNotice}
+                </p>
+            )}
+
+            {/* La modale, seulement quand elle est ouverte */}
+            {showReviewModal && (
+                <ReviewModal
+                    chatId={chatId}
+                    onClose={() => setShowReviewModal(false)}
+                    onGenerated={handleReviewGenerated}
+                />
+            )}
             {/* Les messages */}
             <section aria-label="Discussion" className="flex-1 overflow-y-auto bg-[#e6e6f0] p-8">
                 {isLoading && <p className="text-gray-500">Chargement de la discussion...</p>}
