@@ -71,7 +71,7 @@ export default function ChatWindow({ chatId, onChatCreated }) {
     const [error, setError] = useState(""); // un message d'erreur
     const [input, setInput] = useState(""); // 🆕 le texte en train d'être écrit
     const [isSending, setIsSending] = useState(false); // 🆕 vrai pendant que l'IA réfléchit
-    const bottomRef = useRef(null); // 🆕 un repère tout en bas, pour y faire défiler
+    const sectionRef = useRef(null); // la zone des messages, pour la faire défiler
     const [showReviewModal, setShowReviewModal] = useState(false); // vrai quand la modale est ouverte
     const [reviewNotice, setReviewNotice] = useState(""); // le message "Revue générée ✅"
 
@@ -92,7 +92,9 @@ export default function ChatWindow({ chatId, onChatCreated }) {
 
     // 🆕 À chaque nouveau message, on fait défiler jusqu'en bas
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        // On fait défiler SEULEMENT la zone des messages (pas toute la page)
+        const section = sectionRef.current;
+        if (section) section.scrollTo({ top: section.scrollHeight, behavior: "smooth" });
     }, [messages, isSending]);
 
     // 🆕 Envoi d'un message
@@ -183,7 +185,7 @@ export default function ChatWindow({ chatId, onChatCreated }) {
                 />
             )}
             {/* Les messages */}
-            <section aria-label="Discussion" className="flex-1 overflow-y-auto bg-[#e6e6f0] p-8">
+            <section ref={sectionRef} aria-label="Discussion" className="flex-1 overflow-y-auto bg-[#e6e6f0] p-8">
                 {isLoading && <p className="text-gray-500">Chargement de la discussion...</p>}
 
                 {!isLoading && messages.length === 0 && <WelcomeCard />}
@@ -209,7 +211,7 @@ export default function ChatWindow({ chatId, onChatCreated }) {
                     </p>
                 )}
 
-                <div ref={bottomRef} />
+
             </section>
 
             {/* 🆕 La zone d'écriture, en bas */}
