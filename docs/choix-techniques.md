@@ -23,7 +23,6 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | Un seul **contrôleur de badge**, `get_current_user_id`, appelé par chaque route avec `Depends` | la vérification est écrite une seule fois : impossible d'oublier de la faire sur une nouvelle route |
 | Même message d'erreur (401) pour un email inconnu et un mauvais mot de passe | on ne révèle pas quels emails ont un compte |
 | Badge rangé dans le **local storage** du navigateur ; `apiFetch` l'ajoute à chaque demande et renvoie vers `/login` en cas de 401 | demandé par l'énoncé ; tout le frontend passe par un seul outil |
-| Un champ mot de passe ajouté à la page de connexion | il manquait sur la maquette, mais il est nécessaire pour se connecter |
 
 ## Sécurité des discussions
 
@@ -40,10 +39,7 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | **Mistral** (`mistral-small-latest`) comme LLM | compatible avec PydanticAI, peu coûteux, déjà utilisé dans des projets précédents |
 | On n'entraîne pas le LLM nous-mêmes : on contrôle son comportement avec le **prompt système** | le modèle est déjà entraîné par Mistral AI ; le prompt suffit pour fixer son rôle, sa langue, son ton et ses règles, sans réentraînement (fine-tuning), qui coûterait cher et demanderait beaucoup de données |
 | Tout l'**historique** est enregistré en JSON dans la colonne `messages` et renvoyé à l'IA à chaque message | l'IA se souvient de la conversation, et l'utilisateur peut reprendre une ancienne discussion |
-| `to_display_messages` transforme l'historique de PydanticAI en messages simples (`role`, `content`, `timestamp`) | le frontend n'a pas besoin de connaître le format interne de PydanticAI |
 | `defer_model_check=True` | la clé Mistral n'est vérifiée qu'au moment d'appeler le LLM : les tests peuvent tourner sans clé |
-| Erreur **502** si le LLM ne répond pas | le problème vient d'un service extérieur, pas de la demande de l'utilisateur |
-| Les réponses de l'IA sont affichées avec **`react-markdown`** | l'IA écrit en Markdown (`###` pour un titre, `**` pour le gras, `-` pour une liste) ; sans traitement, l'utilisateur verrait ces symboles tels quels. `react-markdown` les transforme en vrais titres, gras et listes |
 
 ## Les actualités du jour
 
@@ -76,7 +72,6 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | L'historique est transformé en **texte simple** (`history_to_text` dans `review_agent.py`), avec les questions, les réponses, les actualités du jour et les articles trouvés par l'outil | l'agent revue de presse voit tout le contexte, y compris les liens des articles, sans dépendre du format des outils de l'agent du chat |
 | La revue est stockée dans la table `chat` (4 colonnes `review_...` dans `models.py`, ajoutées par `database.py` ; remplies par `review_routes.py`), **une revue par discussion** | l'énoncé demande d'ajouter les informations de la revue au modèle `Chat`, plutôt que de créer une nouvelle table. Conséquence : chaque discussion n'a de la place que pour une seule revue, et en générer une nouvelle remplace l'ancienne |
 | Erreur **400** si la discussion est vide (`review_routes.py`) ; le bouton n'apparaît que s'il y a des messages (`ChatWindow.js`) | il n'y a rien à résumer dans une discussion vide |
-| Bouton **Copier** sur chaque revue (`ReviewsList.js`) | le journaliste peut coller la revue où il veut (e-mail, traitement de texte) |
 
 ## Tests et qualité
 
@@ -86,7 +81,6 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | Faux LLM de PydanticAI (`TestModel`, `FunctionModel`, dans `test_chats.py` et `test_reviews.py`) et `ALLOW_MODEL_REQUESTS = False` (`conftest.py`) | tests gratuits, rapides, sans clé, avec des réponses prévisibles |
 | Faux appels à World News API (`monkeypatch`, dans `conftest.py` et `test_chats.py`) | pas de quota utilisé, et des résultats prévisibles |
 | CI avec **GitHub Actions** et `uv` (`.github/workflows/tests.yml`) | les tests tournent sur un ordinateur neuf à chaque push : on détecte un oubli (fichier non commité, dépendance manquante) |
-| Version de `httpx2` fixée à `2.15.0` (`backend/pyproject.toml`) | la version suivante provoquait une erreur avec Python 3.13 |
 
 ## Déploiement
 
