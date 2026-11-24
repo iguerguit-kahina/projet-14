@@ -1,5 +1,11 @@
 # NewsFoundry
+## Documentation
 
+- Application en ligne : https://projet-14-beta.vercel.app
+- [Architecture](docs/architecture.md) : structure du code, routes, agents
+- [Installation et tests](docs/installation-et-tests.md) : lancer le projet, lancer les tests (`uv run pytest`), déploiement
+- [Choix techniques](docs/choix-techniques.md) : les choix faits et leurs raisons
+- [Pistes d'amélioration](docs/ameliorations.md) : qualité et performance de la partie IA
 ## Besoins fonctionnels
 
 - L'utilisateur peut se connecter.
