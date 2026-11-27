@@ -96,6 +96,19 @@ Toutes les routes, sauf `/login`, demandent le badge JWT dans l'en-tête `Author
 | POST | `/chats/{chat_id}/review` | génère la revue de presse de la discussion sur un thème |
 | GET | `/reviews` | liste toutes mes revues de presse |
 
+## Les erreurs de l'API
+
+Le backend renvoie ces erreurs avec `HTTPException` (FastAPI). Le frontend affiche le message à l'utilisateur.
+
+| Code | Message renvoyé | Quand | Fichier |
+|---|---|---|---|
+| 401 | « Email ou mot de passe incorrect » | mauvais identifiants au login | `routes/auth_routes.py` |
+| 401 | « Badge manquant » / « Badge invalide ou expiré » | pas de badge, faux badge ou badge expiré (le frontend renvoie alors vers `/login`) | `auth.py` |
+| 404 | « Discussion introuvable » | la discussion n'existe pas, ou n'appartient pas à l'utilisateur | `routes/chat_routes.py`, `routes/review_routes.py` |
+| 400 | « La discussion est vide : envoyez d'abord un message. » | revue demandée sur une discussion sans message | `routes/review_routes.py` |
+| 502 | « L'IA n'a pas pu répondre. Réessayez. » | Mistral ne répond pas pendant le chat | `routes/chat_routes.py` |
+| 502 | « L'IA n'a pas pu générer la revue de presse. Réessayez. » | Mistral ne répond pas pendant la revue | `routes/review_routes.py` |
+
 ## Le parcours d'un message
 
 1. Le frontend envoie le message avec `POST /chats/{chat_id}/messages` et le badge.
