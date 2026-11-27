@@ -22,7 +22,7 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | Le badge contient l'**identifiant** de l'utilisateur (`sub`), pas son email | on retrouve directement ses discussions avec `user_id`, et l'email peut changer sans casser les badges |
 | Un seul **contrôleur de badge**, `get_current_user_id`, appelé par chaque route avec `Depends` | la vérification est écrite une seule fois : impossible d'oublier de la faire sur une nouvelle route |
 | Même message d'erreur (401) pour un email inconnu et un mauvais mot de passe | on ne révèle pas quels emails ont un compte |
-| Badge rangé dans le **local storage** du navigateur ; `apiFetch` l'ajoute à chaque demande et renvoie vers `/login` en cas de 401 | demandé par l'énoncé ; tout le frontend passe par un seul outil |
+| Badge rangé dans le **local storage** du navigateur ; `apiFetch` l'ajoute à chaque demande et renvoie vers `/login` en cas de 401 | demandé par la mission ; tout le frontend passe par un seul outil |
 
 ## Sécurité des discussions
 
@@ -38,8 +38,8 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 |---|---|
 | **Mistral** (`mistral-small-latest`) comme LLM | compatible avec PydanticAI, peu coûteux, déjà utilisé dans des projets précédents |
 | On n'entraîne pas le LLM nous-mêmes : on contrôle son comportement avec le **prompt système** | le modèle est déjà entraîné par Mistral AI ; le prompt suffit pour fixer son rôle, sa langue, son ton et ses règles, sans réentraînement (fine-tuning), qui coûterait cher et demanderait beaucoup de données |
-| Tout l'**historique** est enregistré en JSON dans la colonne `messages` et renvoyé à l'IA à chaque message | l'IA se souvient de la conversation, et l'utilisateur peut reprendre une ancienne discussion |
-| `defer_model_check=True` | la clé Mistral n'est vérifiée qu'au moment d'appeler le LLM : les tests peuvent tourner sans clé |
+| Tout l'**historique** est enregistré en JSON dans la colonne `messages` et renvoyé à l'IA à chaque message (`send_message` dans `chat_routes.py`) | un LLM n'a aucune mémoire entre deux appels : en lui renvoyant l'historique, il se souvient de la conversation, et l'utilisateur peut reprendre une ancienne discussion |
+| Erreur **502** si Mistral ne répond pas, avec un message affiché à l'utilisateur | le problème vient d'un service extérieur ; l'utilisateur est prévenu et peut réessayer |
 
 ## Les actualités du jour
 
@@ -49,7 +49,7 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 | On garde un seul article par sujet, avec seulement le titre et le résumé, 10 maximum (`news.py` → `fetch_top_news`, `MAX_ARTICLES = 10`) | un prompt court : moins de coût, et l'IA reste concentrée |
 | Le prompt est fabriqué et **enregistré à la création de chaque discussion** (route `create_chat` dans `chat_routes.py`, colonne `system_prompt` de la table `chat`) | au démarrage du backend, les actualités vieilliraient ; à chaque message, on ferait trop d'appels à l'API et l'IA pourrait se contredire ; enregistré, il reste stable : une discussion de lundi garde les actualités de lundi |
 | Si World News API est en panne, la discussion est créée quand même, avec un prompt qui le signale (`try / except` dans `create_chat`, puis `build_system_prompt` sans articles) | une panne extérieure ne doit pas empêcher d'utiliser le chat |
-| Les nouvelles colonnes sont ajoutées avec `ALTER TABLE ... IF NOT EXISTS` dans `init_db()` (`database.py`) | `create_all` ne modifie pas une table qui existe déjà ; cette solution simple suffit pour ce projet (voir les pistes d'amélioration : Alembic) |
+| Les nouvelles colonnes sont ajoutées avec `ALTER TABLE ... IF NOT EXISTS` dans `init_db()` (`database.py`) | `create_all` ne modifie pas une table qui existe déjà ; cette solution simple suffit pour ce projet |
 
 ## L'outil de recherche d'articles
 
@@ -65,22 +65,11 @@ a été imposée par le CTO (voir le `README.md` à la racine).
 
 | Choix | Raison |
 |---|---|
-| Un **second agent** (`review_agent`, dans `review_agent.py`), séparé de celui du chat, **sans outil** | recommandation de l'énoncé : un agent spécialisé dans une seule tâche est plus performant qu'un agent généraliste |
+| Un **second agent** (`review_agent`, dans `review_agent.py`), séparé de celui du chat, **sans outil** | recommandation de la mission : un agent spécialisé dans une seule tâche est plus performant qu'un agent généraliste |
 | Une **sortie structurée** (`output_type=PressReview`, formulaire défini dans `schemas.py`) : titre, synthèse générale, liste d'articles (titre, source, date, lien, résumé) | l'IA doit remplir un formulaire au lieu d'écrire un texte libre : le résultat a toujours la même forme et peut être enregistré et affiché directement |
-| Date et lien **optionnels** dans le formulaire (`ArticleSummary` dans `schemas.py`) | on ne force pas l'IA à inventer une information absente de la discussion |
 | Instructions strictes (`REVIEW_INSTRUCTIONS` dans `review_agent.py`) : utiliser uniquement la discussion, ne rien inventer | la revue doit refléter les articles réellement trouvés |
-| L'historique est transformé en **texte simple** (`history_to_text` dans `review_agent.py`), avec les questions, les réponses, les actualités du jour et les articles trouvés par l'outil | l'agent revue de presse voit tout le contexte, y compris les liens des articles, sans dépendre du format des outils de l'agent du chat |
-| La revue est stockée dans la table `chat` (4 colonnes `review_...` dans `models.py`, ajoutées par `database.py` ; remplies par `review_routes.py`), **une revue par discussion** | l'énoncé demande d'ajouter les informations de la revue au modèle `Chat`, plutôt que de créer une nouvelle table. Conséquence : chaque discussion n'a de la place que pour une seule revue, et en générer une nouvelle remplace l'ancienne |
+| La revue est stockée dans la table `chat` (4 colonnes `review_...` dans `models.py`, ajoutées par `database.py` ; remplies par `review_routes.py`), **une revue par discussion** | la mission demande d'ajouter les informations de la revue au modèle `Chat`, plutôt que de créer une nouvelle table. Conséquence : chaque discussion n'a de la place que pour une seule revue, et en générer une nouvelle remplace l'ancienne |
 | Erreur **400** si la discussion est vide (`review_routes.py`) ; le bouton n'apparaît que s'il y a des messages (`ChatWindow.js`) | il n'y a rien à résumer dans une discussion vide |
-
-## Tests et qualité
-
-| Choix | Raison |
-|---|---|
-| Base **SQLite en mémoire** pour les tests (`tests/conftest.py`) | rapide, vide au début de chaque test, et la vraie base n'est jamais touchée |
-| Faux LLM de PydanticAI (`TestModel`, `FunctionModel`, dans `test_chats.py` et `test_reviews.py`) et `ALLOW_MODEL_REQUESTS = False` (`conftest.py`) | tests gratuits, rapides, sans clé, avec des réponses prévisibles |
-| Faux appels à World News API (`monkeypatch`, dans `conftest.py` et `test_chats.py`) | pas de quota utilisé, et des résultats prévisibles |
-| CI avec **GitHub Actions** et `uv` (`.github/workflows/tests.yml`) | les tests tournent sur un ordinateur neuf à chaque push : on détecte un oubli (fichier non commité, dépendance manquante) |
 
 ## Déploiement
 

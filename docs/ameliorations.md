@@ -17,9 +17,16 @@ Chaque piste suit le même plan : **le problème**, **un exemple** (vu ou mesur�
 
 - Le 24/11/2026, dans une réponse sur les passoires thermiques, l'IA a écrit : « 9,54 milliards d'euros retirés du Livret A en 2026, reflétant une crise du pouvoir d'achat et des difficultés à investir dans la rénovation. » Ce chiffre n'est dans aucun des articles cités, et le lien avec la rénovation est inventé. Dans la même liste, l'autre chiffre (« 17,1 % des ménages d'Occitanie ») venait bien d'un article.
 - Le 19/11/2026, l'IA a écrit que la location des logements classés G serait interdite en 2028 et celle des F en 2034. Le vrai calendrier de la loi Climat et Résilience est : G en 2025, F en 2028, E en 2034.
-- Le même test refait le 24/11 n'a pas reproduit l'erreur des dates : le comportement du LLM varie d'une fois à l'autre. Les règles ajoutées au prompt aident, mais pas à tous les coups.
 
 **La solution.** Donner une **sortie structurée** à l'agent du chat quand il présente des articles, comme pour la revue de presse : une liste d'articles d'un côté, et une synthèse qui ne peut s'appuyer que sur ces articles. Le frontend affiche alors clairement ce qui vient des sources.
+
+**Les fichiers à modifier.**
+
+- `schemas.py` : créer un nouveau formulaire pour les réponses du chat, avec le texte de la réponse et la liste des articles (en réutilisant `ArticleSummary`, déjà créé pour la revue).
+- `agent.py` : `chat_agent` utilise ce formulaire (`output_type`), et le prompt précise que le texte ne doit utiliser que les articles de la liste.
+- `routes/chat_routes.py` : renvoyer au frontend le texte et les articles séparément.
+- `components/ChatWindow.js` : afficher le texte dans la bulle, et les articles dans des cartes en dessous (comme dans la page des revues).
+- Pour vérifier : un nouveau fichier avec les 20 questions de test, et `tests/test_chats.py` à adapter.
 
 **Comment vérifier.** Préparer 20 questions de test et relancer ces questions à chaque modification : objectif **0 chiffre ou date absent des articles**, contrôlé à la main ou par un second LLM « juge ».
 
@@ -64,6 +71,12 @@ Les pistes ci-dessous proposent une solution pour chacun de ces problèmes.
 2. Frontend : lire la réponse au fur et à mesure avec `fetch`, et ajouter chaque morceau dans la bulle de l'IA.
 3. Enregistrer l'historique dans la base une fois la réponse terminée.
 
+**Les fichiers à modifier.**
+
+- `routes/chat_routes.py` : la route des messages utilise `chat_agent.run_stream` et renvoie une `StreamingResponse`.
+- `lib/api.js` : une version d'`apiFetch` qui lit la réponse au fur et à mesure.
+- `components/ChatWindow.js` : la bulle de l'IA se remplit morceau par morceau.
+
 **Comment vérifier.** Le premier mot s'affiche en **moins de 2 secondes** après l'envoi du message.
 
 ### 3. Accélérer la génération des revues de presse
@@ -77,6 +90,12 @@ Les pistes ci-dessous proposent une solution pour chacun de ces problèmes.
 - Donner à l'agent revue de presse **seulement les articles** trouvés (résultats de l'outil et actualités du jour), sans les longues réponses de l'agent du chat. Le texte à lire est plus court, et la revue ne peut pas reprendre une erreur écrite par l'agent du chat (voir la piste 1).
 - Pendant la génération, afficher une **barre de progression** ou un message plus précis que « Génération en cours… ».
 
+**Les fichiers à modifier.**
+
+- `review_agent.py` : une nouvelle fonction qui extrait seulement les articles de l'historique (à la place de `history_to_text`).
+- `routes/review_routes.py` : donner à l'agent le thème et ces articles, au lieu de toute la discussion.
+- `components/ReviewModal.js` : un message d'attente plus précis pendant la génération.
+
 **Comment vérifier.** Génération en **moins de 8 secondes**, quelle que soit la longueur de la discussion.
 
 ### 4. Mesurer automatiquement avec MLflow
@@ -87,16 +106,20 @@ Les pistes ci-dessous proposent une solution pour chacun de ces problèmes.
 
 **La solution.** Brancher **MLflow** sur les appels de PydanticAI. MLflow fonctionne comme un **cahier automatique** : à chaque réponse de l'IA, il note tout seul la question, la réponse, le temps de réponse et le nombre de tokens. Tout s'affiche ensuite dans une page web, sans F12.
 
+**Les fichiers à modifier.**
+
+- `pyproject.toml` : ajouter la librairie `mlflow` (avec `uv add mlflow`).
+- `main.py` : activer le suivi MLflow au démarrage du backend, pour que chaque appel des agents soit enregistré.
+- `.env` et Variables de Railway : l'adresse du serveur MLflow, qui affiche la page web des enregistrements.
+
 **Comment vérifier.** 100 % des réponses de l'IA sont enregistrées dans MLflow, avec leur temps, sans aucune mesure à la main.
 
 ## Autres pistes, en bref
 
 - Filtrer les actualités du jour : le 19/11, l'IA a cité l'horoscope comme une actualité.
 - Mieux trier les résultats de recherche : le 24/11, un article sur l'état des lycées est sorti pour une question sur les passoires thermiques.
-- Envoyer au LLM un historique plus court (les derniers échanges + un résumé), car les réponses ralentissent quand la discussion s'allonge (7,16 s au 1er message, 16,78 s au 5e).
 
 ## Autres améliorations (hors IA)
 
-- Utiliser **Alembic** pour les migrations de la base, au lieu des `ALTER TABLE` dans `init_db()`.
 - Permettre de **supprimer** une discussion (`DELETE /chats/{chat_id}`) et de garder **plusieurs revues** par discussion (table séparée).
 - Ajouter une page d'**inscription** et le choix du pays des actualités.
