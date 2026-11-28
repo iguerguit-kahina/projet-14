@@ -1,73 +1,54 @@
 # NewsFoundry
-## Documentation
 
-- Application en ligne : https://projet-14-beta.vercel.app
-- [Architecture](docs/architecture.md) : structure du code, routes, agents
-- [Installation et tests](docs/installation-et-tests.md) : lancer le projet, lancer les tests (`uv run pytest`), déploiement
-- [Choix techniques](docs/choix-techniques.md) : les choix faits et leurs raisons
-- [Pistes d'amélioration](docs/ameliorations.md) : qualité et performance de la partie IA
-## Besoins fonctionnels
+NewsFoundry aide les journalistes pigistes à préparer leurs revues de presse.
+L'utilisateur discute avec une IA qui connaît l'actualité du jour, peut chercher des articles récents, puis génère une revue de presse structurée à partir de la discussion.
 
-- L'utilisateur peut se connecter.
-- L’utilisateur peut voir la liste de ses discussions passées.
-- L’utilisateur peut démarrer une nouvelle discussion ou reprendre une ancienne discussion.
-- Un utilisateur n’est pas autorisé à accéder aux discussions d’un autre utilisateur.
-- Le LLM répond aux messages envoyés par l’utilisateur.
-- L'utilisateur peut faire générer une revue de presse à partir d'une discussion.
-- L'application doit afficher des messages d'erreur à l'utilisateur final en cas d'erreur.
+## Application en ligne
 
-## Prérequis
+| Partie | Hébergement | URL |
+|---|---|---|
+| Frontend | Vercel | https://projet-14-beta.vercel.app |
+| Backend (API) | Railway | https://projet-14-production.up.railway.app |
+| Documentation de l'API (Swagger) | Railway | https://projet-14-production.up.railway.app/docs |
 
-- Docker
-- Python 3.13
-- uv
-- Node.js 22.19
+Compte de démonstration : `test@test.com` / `test`
 
-## Installation
+## Documentation technique
 
-1. Cloner le repository
-2. Démarrer le backend aved les instructions du fichier `backend/README.md`
-3. Initialiser un projet Next.js dans un dossier `frontend/`
+| Fichier | Contenu |
+|---|---|
+| [Architecture](docs/architecture.md) | structure des dossiers, tables, routes, erreurs de l'API, parcours d'un message, les deux agents |
+| [Choix techniques](docs/choix-techniques.md) | les choix faits pendant le projet, et leurs raisons (dont les choix de prompts) |
+| [Installation et tests](docs/installation-et-tests.md) | lancer le projet en local, lancer les tests, CI, déploiement |
+| [Pistes d'amélioration](docs/ameliorations.md) | qualité et performance de la partie IA : mesures, solutions, objectifs |
 
-## Choix technologiques
+## Stack
 
-### Frontend
+- **Backend** : Python, FastAPI, SQLModel, PydanticAI, Mistral (dossier `backend/`)
+- **Frontend** : Next.js, Tailwind CSS (dossier `frontend/`)
+- **Base de données** : PostgreSQL
+- **Actualités** : World News API
 
-**Next.js**
+## Démarrage rapide
 
-### Backend
+```bash
+# Backend (après avoir rempli backend/.env et lancé PostgreSQL)
+cd backend
+uv sync
+uv run --env-file .env src/main.py
 
-- **Python** pour bénéficier de son écosystème de librairies IA
-- **FastAPI** pour le développement de l'API
-- Connection avec des **JWT**
-- **SQLModel** comme ORM : fait pour bien marcher avec FastAPI.
-  - Branché à une base de données **PostgreSQL**
-- **PydanticAI** comme client qui s'intégrera aussi bien avec les autres outils de la stack backend
-- Attention à la **sécurité des données**. On ne veut pas qu’un utilisateur puisse accéder aux chats d’un autre utilisateur ou les modifier.
-  - Le produit aura rapidement beaucoup d’utilisateurs professionnels il est donc crucial de garantir le fonctionnement correct de cette fonctionnalité par l'**implémentation de tests automatisés qui s'exécutent par une Github Action**.
-- Pour les sources de news, on utilisera l’API [**WorldNewsAPI**](https://worldnewsapi.com/).
-- Pour déployer on mettra le frontend sur **Vercel** et le backend sur **Railway**.
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
 
-### Documentation
+## Lancer les tests
 
-Une documentation claire devra être rédigée et ajoutée dans un dossier `docs/`.
+```bash
+cd backend
+uv run pytest
+```
 
-Elle devra inclure des suggestions d'amélioration concernant la qualité et la performance de la partie IA du système. Chaque recommandation doit être illustrée par une une métrique ou un exemple, une proposition d’implémentation réalisable, ainsi qu'un objectif mesurable.
-
-
-Par ailleurs, pour faciliter la maintenance du projet à long terme, le code du projet devra être clair et bien structuré, accompagné de commentaires qui expliquent les sections de code complexes.
-
-### Deploiement
-
-L'url de l'application déployée devra être ajouté dans la documentation.
-
-#### Frontend
-
-Déployer le frontend sur [Vercel](https://vercel.com/dashboard).
-
-#### Backend
-
-Déployer le backend sur [Railway](https://railway.com/dashboard).
-
-> Un Dockerfile est déjà présent pour faciliter le déploiement. Il faudra simplement référencer `backend/` comme "Root Directory" après avoir connecté le repository.
-> La base de donnée postgres peut être créée via Railway dans le même projet que le backend.
+Les tests sont aussi lancés automatiquement par GitHub Actions à chaque push sur `main`.
+Le détail de toutes ces étapes est dans [Installation et tests](docs/installation-et-tests.md).
